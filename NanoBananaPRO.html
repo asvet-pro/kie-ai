@@ -195,16 +195,6 @@
         <textarea id="prompt" placeholder="Опиши стиль обложки, цвета, настроение..."></textarea>
       </label>
       <label>
-        Размер
-        <select id="size">
-          <option value="1280x720">YouTube 1280x720 (16:9)</option>
-          <option value="1920x1080">YouTube 1920x1080 (16:9)</option>
-          <option value="1080x1080">Instagram 1080x1080 (1:1)</option>
-          <option value="1080x1350">Instagram 1080x1350 (4:5)</option>
-          <option value="1080x1920">Stories 1080x1920 (9:16)</option>
-        </select>
-      </label>
-      <label>
         Aspect Ratio (все варианты из API)
         <select id="aspectRatio">
           <option value="1:1">1:1</option>
@@ -265,7 +255,7 @@
         </div>
       </div>
       <div class="row" style="justify-content: space-between; align-items: center;">
-        <span class="badge" id="sizeBadge">16:9 • 1280×720</span>
+        <span class="badge" id="sizeBadge">Соотношение</span>
         <span class="badge" id="photoBadge">фото не загружено</span>
       </div>
     </section>
@@ -275,7 +265,6 @@
   <script>
     const apiKeyEl = document.getElementById('apiKey');
     const promptEl = document.getElementById('prompt');
-    const sizeEl = document.getElementById('size');
     const aspectEl = document.getElementById('aspectRatio');
     const resolutionEl = document.getElementById('resolution');
     const positionEl = document.getElementById('position');
@@ -293,27 +282,28 @@
     let photoItems = []; // [{name, preview, base64, uploadedUrl}]
     let lastResultBlob = null;
 
-    let aspectManual = false;
-
     function setStatus(text, isError = false) {
       statusEl.textContent = text;
       statusEl.style.color = isError ? 'var(--danger)' : 'var(--muted)';
     }
 
+    function parseAspect(val) {
+      const m = /^\s*(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)\s*$/.exec(val || '');
+      if (!m) return [16, 9];
+      const w = parseFloat(m[1]);
+      const h = parseFloat(m[2]);
+      if (!w || !h) return [16, 9];
+      return [w, h];
+    }
+
     function updateBadges() {
-      const [w, h] = sizeEl.value.split('x').map(Number);
+      const [w, h] = parseAspect(aspectEl.value);
       const ratio = (w / h).toFixed(2);
-      sizeBadge.textContent = `${ratio}:1 • ${w}×${h}`;
+      sizeBadge.textContent = `Соотношение ${w}:${h} • ${ratio}:1 • ${resolutionEl.value}`;
       photoBadge.textContent = photoItems.length ? `фото (${photoItems.length})` : 'фото не загружено';
       const pad = (h / w) * 100;
       const box = document.getElementById('box');
       box.style.paddingBottom = `${pad}%`;
-      if (!aspectManual) {
-        const ar = toAspectRatio(w, h);
-        if ([...aspectEl.options].some(o => o.value === ar)) {
-          aspectEl.value = ar;
-        }
-      }
       drawOverlay();
     }
 
@@ -444,18 +434,6 @@
       }
     }
 
-    function toAspectRatio(w, h) {
-      const key = `${w}x${h}`;
-      const map = {
-        '1280x720': '16:9',
-        '1920x1080': '16:9',
-        '1080x1080': '1:1',
-        '1080x1350': '4:5',
-        '1080x1920': '9:16'
-      };
-      return map[key] || `${w}:${h}`;
-    }
-
     function extractImageFromResult(result) {
       let imageUrl = null;
       const resJson = result?.data?.resultJson;
@@ -528,9 +506,9 @@
       generateBtn.disabled = true;
       downloadBtn.disabled = true;
 
-      const [w, h] = sizeEl.value.split('x').map(Number);
       const scale = Math.min(Math.max(parseFloat(scaleEl.value) || 0.5, 0.3), 1);
-      const aspect = toAspectRatio(w, h);
+      const aspect = (aspectEl.value && aspectEl.value.trim()) || '16:9';
+      const stamp = Date.now(); // чтобы имя файла было уникальным и не ловить кэш
 
       // 1) upload base64 -> URL (до 8 файлов)
       if (!photoItems.every(it => it.uploadedUrl)) {
@@ -547,7 +525,7 @@
             body: JSON.stringify({
               base64Data: dataUrl,
               uploadPath: 'covers',
-              fileName: `cover-photo-${i + 1}.png`
+              fileName: `cover-photo-${stamp}-${i + 1}.png`
             })
           });
           if (!uploadRes.ok) throw new Error(await uploadRes.text() || `upload HTTP ${uploadRes.status}`);
@@ -643,9 +621,11 @@
       if (!lastResultBlob) return;
       const url = URL.createObjectURL(lastResultBlob);
       const a = document.createElement('a');
-      const [w, h] = sizeEl.value.split('x');
+      const aspectVal = (aspectEl.value && aspectEl.value.trim()) || '16:9';
+      const safeAspect = aspectVal.replace(/[^0-9:]/g, '').replace(':', 'x') || 'aspect';
+      const res = resolutionEl.value || '1K';
       a.href = url;
-      a.download = `cover-${w}x${h}.png`;
+      a.download = `cover-${safeAspect}-${res}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -665,9 +645,8 @@
       updateBadges();
     }
 
-    sizeEl.addEventListener('change', updateBadges);
-    aspectEl.addEventListener('change', () => { aspectManual = true; drawOverlay(); });
-    resolutionEl.addEventListener('change', () => setStatus('Ожидаю действий.'));
+    aspectEl.addEventListener('change', () => { drawOverlay(); updateBadges(); });
+    resolutionEl.addEventListener('change', () => { setStatus('Ожидаю действий.'); updateBadges(); });
     promptEl.addEventListener('input', drawOverlay);
     photoInput.addEventListener('change', (e) => {
       if (e.target.files && e.target.files.length) handleFiles(e.target.files);
