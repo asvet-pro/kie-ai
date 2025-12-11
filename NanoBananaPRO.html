@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nano Banana Обложки</title>
+  <style>
+    :root {
+      --bg: #0c0c0c;
+      --panel: #111;
+      --border: #2a2a2a;
+      --accent: #8fff5a;
+      --muted: #9ea1a6;
+      --danger: #ff6b6b;
+      --mono: "Fira Code", "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: #e6e6e6;
+      font-family: var(--mono);
+      display: flex;
+      min-height: 100vh;
+    }
+    main {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      width: 100%;
+      gap: 16px;
+      padding: 16px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 20px;
+      letter-spacing: 0.02em;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    input[type="text"],
+    input[type="file"],
+    select,
+    textarea {
+      background: #0b0b0b;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: #e6e6e6;
+      padding: 8px 10px;
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+    textarea { min-height: 82px; resize: vertical; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .badge {
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    button {
+      background: linear-gradient(135deg, #1b1b1b, #111);
+      border: 1px solid var(--border);
+      color: #e6e6e6;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: var(--mono);
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.08s;
+    }
+    button:hover { border-color: var(--accent); }
+    button:active { transform: translateY(1px); }
+    .primary { background: linear-gradient(135deg, #182b11, #0f1c0a); border-color: #28451a; color: #dfffcb; }
+    .danger { border-color: #5a2222; color: var(--danger); }
+    .preview {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .ascii-frame {
+      background: #050505;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      min-height: 340px;
+      position: relative;
+      overflow: hidden;
+    }
+    .ascii-box {
+      width: 100%;
+      height: 0;
+      padding-bottom: 56.25%; /* 16:9 default */
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      position: relative;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+    .result {
+      position: absolute;
+      inset: 12px;
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: contain;
+      border-radius: 8px;
+      pointer-events: none;
+    }
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 6px;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+    .file-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      background: #0b0b0b;
+      cursor: grab;
+    }
+    .file-row.dragging { opacity: 0.5; }
+    .file-row.dragover { border-color: var(--accent); }
+    .file-name {
+      border: none;
+      background: transparent;
+      color: #e6e6e6;
+      font-family: var(--mono);
+      font-size: 12px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .file-del {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--danger);
+      border-radius: 4px;
+      width: 22px;
+      height: 22px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .status {
+      background: #0b0b0b;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      min-height: 60px;
+      white-space: pre-wrap;
+    }
+    canvas { display: none; }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="panel" aria-label="controls">
+      <div class="row" style="justify-content: space-between; align-items: baseline;">
+        <h1>Nana Banana PRO</h1>
+      </div>
+      <label>
+        API Key (kie.ai)
+        <input id="apiKey" type="text" placeholder="sk-..." />
+      </label>
+      <label>
+        Текст/промпт
+        <textarea id="prompt" placeholder="Опиши стиль обложки, цвета, настроение..."></textarea>
+      </label>
+      <label>
+        Размер
+        <select id="size">
+          <option value="1280x720">YouTube 1280x720 (16:9)</option>
+          <option value="1920x1080">YouTube 1920x1080 (16:9)</option>
+          <option value="1080x1080">Instagram 1080x1080 (1:1)</option>
+          <option value="1080x1350">Instagram 1080x1350 (4:5)</option>
+          <option value="1080x1920">Stories 1080x1920 (9:16)</option>
+        </select>
+      </label>
+      <label>
+        Aspect Ratio (все варианты из API)
+        <select id="aspectRatio">
+          <option value="1:1">1:1</option>
+          <option value="2:3">2:3</option>
+          <option value="3:2">3:2</option>
+          <option value="3:4">3:4</option>
+          <option value="4:3">4:3</option>
+          <option value="4:5">4:5</option>
+          <option value="5:4">5:4</option>
+          <option value="9:16">9:16</option>
+          <option value="16:9">16:9</option>
+          <option value="21:9">21:9</option>
+          <option value="auto">auto</option>
+        </select>
+      </label>
+      <div class="row">
+        <label style="flex:1;">
+          Позиция фото
+          <select id="position">
+            <option value="left">слева</option>
+            <option value="center">по центру</option>
+            <option value="right">справа</option>
+          </select>
+        </label>
+        <label style="flex:1;">
+          Масштаб фото (0.3–1)
+          <input id="scale" type="text" value="0.5" />
+        </label>
+      </div>
+      <div class="row">
+        <label style="flex:1;">
+          Разрешение
+          <select id="resolution">
+            <option value="1K">1K</option>
+            <option value="2K">2K</option>
+            <option value="4K">4K</option>
+          </select>
+        </label>
+      </div>
+      <label>
+        Загрузить фото (до 8 файлов)
+        <input id="photoInput" type="file" accept="image/*" multiple />
+      </label>
+      <div class="file-list" id="fileList"></div>
+      <div class="row">
+        <button class="primary" id="generateBtn">Сгенерировать</button>
+        <button id="downloadBtn" disabled>Скачать результат</button>
+        <button class="danger" id="clearBtn">Очистить</button>
+      </div>
+      <div class="status" id="status">Ожидаю действий.</div>
+    </section>
+
+    <section class="panel preview" aria-label="preview">
+      <div class="ascii-frame">
+        <div class="ascii-box" id="box">
+          <span style="opacity:0.25;">┌──────── кадр ────────┐</span>
+          <div class="result" id="resultImg"></div>
+        </div>
+      </div>
+      <div class="row" style="justify-content: space-between; align-items: center;">
+        <span class="badge" id="sizeBadge">16:9 • 1280×720</span>
+        <span class="badge" id="photoBadge">фото не загружено</span>
+      </div>
+    </section>
+  </main>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const apiKeyEl = document.getElementById('apiKey');
+    const promptEl = document.getElementById('prompt');
+    const sizeEl = document.getElementById('size');
+    const aspectEl = document.getElementById('aspectRatio');
+    const resolutionEl = document.getElementById('resolution');
+    const positionEl = document.getElementById('position');
+    const scaleEl = document.getElementById('scale');
+    const photoInput = document.getElementById('photoInput');
+    const resultEl = document.getElementById('resultImg');
+    const sizeBadge = document.getElementById('sizeBadge');
+    const photoBadge = document.getElementById('photoBadge');
+    const statusEl = document.getElementById('status');
+    const generateBtn = document.getElementById('generateBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const canvas = document.getElementById('canvas');
+
+    let photoItems = []; // [{name, preview, base64, uploadedUrl}]
+    let lastResultBlob = null;
+
+    let aspectManual = false;
+
+    function setStatus(text, isError = false) {
+      statusEl.textContent = text;
+      statusEl.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+    }
+
+    function updateBadges() {
+      const [w, h] = sizeEl.value.split('x').map(Number);
+      const ratio = (w / h).toFixed(2);
+      sizeBadge.textContent = `${ratio}:1 • ${w}×${h}`;
+      photoBadge.textContent = photoItems.length ? `фото (${photoItems.length})` : 'фото не загружено';
+      const pad = (h / w) * 100;
+      const box = document.getElementById('box');
+      box.style.paddingBottom = `${pad}%`;
+      if (!aspectManual) {
+        const ar = toAspectRatio(w, h);
+        if ([...aspectEl.options].some(o => o.value === ar)) {
+          aspectEl.value = ar;
+        }
+      }
+      drawOverlay();
+    }
+
+    function drawOverlay() {
+      // overlay выключен; рамка остаётся пустой
+    }
+
+    function renderFileList() {
+      const list = document.getElementById('fileList');
+      list.innerHTML = '';
+      if (!photoItems.length) {
+        const empty = document.createElement('div');
+        empty.style.color = 'var(--muted)';
+        empty.style.fontSize = '12px';
+        empty.textContent = 'Нет файлов';
+        list.appendChild(empty);
+        return;
+      }
+      photoItems.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'file-row';
+        row.draggable = true;
+        row.dataset.index = idx;
+
+        row.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', idx.toString());
+          row.classList.add('dragging');
+        });
+        row.addEventListener('dragend', () => row.classList.remove('dragging'));
+        row.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          row.classList.add('dragover');
+        });
+        row.addEventListener('dragleave', () => row.classList.remove('dragover'));
+        row.addEventListener('drop', (e) => {
+          e.preventDefault();
+          row.classList.remove('dragover');
+          const from = parseInt(e.dataTransfer.getData('text/plain'), 10);
+          const to = parseInt(row.dataset.index, 10);
+          if (Number.isNaN(from) || Number.isNaN(to) || from === to) return;
+          const arr = [...photoItems];
+          const [moved] = arr.splice(from, 1);
+          arr.splice(to, 0, moved);
+          photoItems = arr;
+          renderFileList();
+          setPreview(0);
+          updateBadges();
+        });
+
+        const nameBtn = document.createElement('button');
+        nameBtn.className = 'file-name';
+        nameBtn.type = 'button';
+        nameBtn.textContent = item.name;
+        nameBtn.addEventListener('click', () => {
+          setPreview(idx);
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'file-del';
+        delBtn.type = 'button';
+        delBtn.textContent = '×';
+        delBtn.addEventListener('click', () => {
+          photoItems.splice(idx, 1);
+          renderFileList();
+          setPreview(0);
+          updateBadges();
+        });
+
+        row.appendChild(nameBtn);
+        row.appendChild(delBtn);
+        list.appendChild(row);
+      });
+    }
+
+    function setPreview(idx = 0) {
+      if (photoItems[idx]) {
+        resultEl.style.backgroundImage = `url(${photoItems[idx].preview})`;
+      } else {
+        resultEl.style.backgroundImage = 'none';
+      }
+    }
+
+    async function handleFiles(fileList) {
+      const available = Math.max(0, 8 - photoItems.length);
+      const files = Array.from(fileList).slice(0, available); // максимум 8 суммарно
+      if (!files.length) {
+        setStatus('Лимит 8 файлов: удалите что-то, чтобы добавить новое', true);
+        return;
+      }
+
+      const convertOne = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const dataUrl = e.target.result;
+          const img = new Image();
+          img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = img.width;
+            c.height = img.height;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const pngDataUrl = c.toDataURL('image/png');
+            resolve({ preview: dataUrl, base64: pngDataUrl });
+          };
+          img.onerror = () => reject(new Error('Не удалось прочитать изображение'));
+          img.src = dataUrl;
+        };
+        reader.onerror = () => reject(new Error('Ошибка чтения файла'));
+        reader.readAsDataURL(file);
+      });
+
+      try {
+        const converted = await Promise.all(files.map(async (file) => {
+          const c = await convertOne(file);
+          return { name: file.name, preview: c.preview, base64: c.base64, uploadedUrl: null };
+        }));
+        photoItems = photoItems.concat(converted);
+        renderFileList();
+        if (!resultEl.style.backgroundImage || resultEl.style.backgroundImage === 'none') {
+          setPreview(0);
+        }
+        updateBadges();
+      } catch (e) {
+        setPreview(0);
+        setStatus(e.message, true);
+        renderFileList();
+        updateBadges();
+      }
+    }
+
+    function toAspectRatio(w, h) {
+      const key = `${w}x${h}`;
+      const map = {
+        '1280x720': '16:9',
+        '1920x1080': '16:9',
+        '1080x1080': '1:1',
+        '1080x1350': '4:5',
+        '1080x1920': '9:16'
+      };
+      return map[key] || `${w}:${h}`;
+    }
+
+    function extractImageFromResult(result) {
+      let imageUrl = null;
+      const resJson = result?.data?.resultJson;
+      const tryParsed = () => {
+        if (!resJson) return null;
+        const parsed = typeof resJson === 'string' ? JSON.parse(resJson) : resJson;
+        const candidates = [
+          parsed?.image_urls,
+          parsed?.images,
+          parsed?.data,
+          parsed?.output,
+          parsed?.output_urls,
+          parsed?.urls,
+          parsed?.result_urls,
+          parsed?.resultUrls
+        ];
+        for (const c of candidates) {
+          if (Array.isArray(c) && c.length > 0) {
+            const first = c[0];
+            if (typeof first === 'string') return first;
+            if (first?.url) return first.url;
+            if (first?.image_url) return first.image_url;
+            if (first?.imageUrl) return first.imageUrl;
+          }
+        }
+        if (parsed?.image_url) return parsed.image_url;
+        if (parsed?.imageUrl) return parsed.imageUrl;
+        if (parsed?.b64_json) return `data:image/png;base64,${parsed.b64_json}`;
+        return null;
+      };
+      try { imageUrl = tryParsed(); } catch (e) { console.warn('resultJson parse fail', e); }
+
+      if (!imageUrl) {
+        const d = result?.data || {};
+        const directCandidates = [
+          d.image_urls,
+          d.images,
+          d.output,
+          d.output_urls,
+          d.urls,
+          d.result_urls,
+          d.resultUrls
+        ];
+        for (const c of directCandidates) {
+          if (Array.isArray(c) && c.length > 0) {
+            const first = c[0];
+            if (typeof first === 'string') { imageUrl = first; break; }
+            if (first?.url) { imageUrl = first.url; break; }
+            if (first?.image_url) { imageUrl = first.image_url; break; }
+            if (first?.imageUrl) { imageUrl = first.imageUrl; break; }
+          }
+        }
+        if (!imageUrl && d.image_url) imageUrl = d.image_url;
+        if (!imageUrl && d.imageUrl) imageUrl = d.imageUrl;
+        // Последняя попытка: regex по строковому представлению
+        if (!imageUrl) {
+          const rawStr = JSON.stringify(resJson || d || {}, null, 0) || '';
+          const m = rawStr.match(/https?:\/\/[^"'\s]+/i);
+          if (m) imageUrl = m[0];
+        }
+      }
+      return imageUrl;
+    }
+
+    async function generate() {
+      if (!apiKeyEl.value.trim()) return setStatus('Добавьте API ключ kie.ai', true);
+      if (!photoItems.length) return setStatus('Загрузите фото (png/jpg)', true);
+
+      setStatus('Генерация... создаю задачу в kie.ai');
+      generateBtn.disabled = true;
+      downloadBtn.disabled = true;
+
+      const [w, h] = sizeEl.value.split('x').map(Number);
+      const scale = Math.min(Math.max(parseFloat(scaleEl.value) || 0.5, 0.3), 1);
+      const aspect = toAspectRatio(w, h);
+
+      // 1) upload base64 -> URL (до 8 файлов)
+      if (!photoItems.every(it => it.uploadedUrl)) {
+        setStatus('Загружаю фото...');
+        for (let i = 0; i < photoItems.length; i++) {
+          if (photoItems[i].uploadedUrl) continue;
+          const dataUrl = photoItems[i].base64;
+          const uploadRes = await fetch('https://kieai.redpandaai.co/api/file-base64-upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKeyEl.value.trim()}`
+            },
+            body: JSON.stringify({
+              base64Data: dataUrl,
+              uploadPath: 'covers',
+              fileName: `cover-photo-${i + 1}.png`
+            })
+          });
+          if (!uploadRes.ok) throw new Error(await uploadRes.text() || `upload HTTP ${uploadRes.status}`);
+          const uploadJson = await uploadRes.json();
+          if (uploadJson?.code && uploadJson.code !== 200) throw new Error(uploadJson.msg || 'Ошибка загрузки файла');
+          const url = uploadJson?.data?.downloadUrl || uploadJson?.data?.filePath;
+          if (!url) throw new Error('Нет downloadUrl в ответе загрузки');
+          photoItems[i].uploadedUrl = url;
+        }
+      }
+
+      // 2) createTask
+      const payload = {
+        model: 'nano-banana-pro',
+        input: {
+          prompt: promptEl.value || 'Создай обложку для соцсетей',
+          image_input: photoItems.map(it => it.uploadedUrl),
+          aspect_ratio: aspectEl.value || aspect,
+          resolution: resolutionEl.value || '1K',
+          output_format: 'png',
+          // Кастомные подсказки для размещения фото
+          subject_position: positionEl.value,
+          subject_scale: scale
+        }
+      };
+
+      try {
+        const taskRes = await fetch('https://api.kie.ai/api/v1/jobs/createTask', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKeyEl.value.trim()}`
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!taskRes.ok) throw new Error(await taskRes.text() || `HTTP ${taskRes.status}`);
+        const taskJson = await taskRes.json();
+        if (taskJson?.code && taskJson.code !== 200) {
+          throw new Error(taskJson.msg || `code ${taskJson.code}`);
+        }
+        const taskId = taskJson?.data?.taskId || taskJson?.data?.recordId;
+        if (!taskId) throw new Error(`Нет taskId/recordId. Ответ: ${JSON.stringify(taskJson)}`);
+        setStatus(`Задача ${taskId} отправлена. Ждём результат...`);
+
+        // Пулинг статуса
+        const poll = async () => {
+          const r = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`, {
+            headers: { 'Authorization': `Bearer ${apiKeyEl.value.trim()}` }
+          });
+          if (!r.ok) throw new Error(await r.text() || `HTTP ${r.status}`);
+          const j = await r.json();
+          if (j?.code && j.code !== 200) throw new Error(j.msg || `code ${j.code}`);
+          const state = j?.data?.state;
+          if (state === 'success') return j;
+          if (state === 'fail') throw new Error(j?.data?.resultMsg || 'Задача завершилась с ошибкой');
+          return null;
+        };
+
+        let result = null;
+        let imageUrl = null;
+        for (let i = 0; i < 80; i++) { // ~4 минуты при 3 сек интервале
+          const res = await poll();
+          if (res) {
+            result = res;
+            imageUrl = extractImageFromResult(res);
+            if (imageUrl) break;
+            setStatus(`Ответ success, жду ссылку... (${i + 1}/80)`);
+          } else {
+            setStatus(`Генерация... (${i + 1}/80)`);
+          }
+          await new Promise(r => setTimeout(r, 3000));
+        }
+        if (!result) throw new Error('Тайм-аут ожидания результата');
+        if (!imageUrl) {
+          const raw = JSON.stringify(result?.data || {}, null, 2000);
+          throw new Error(`Не нашёл ссылку/картинку. Полный ответ: ${raw}`);
+        }
+
+        lastResultBlob = await (await fetch(imageUrl)).blob();
+        const objectUrl = URL.createObjectURL(lastResultBlob);
+        resultEl.style.backgroundImage = `url(${objectUrl})`;
+        downloadBtn.disabled = false;
+        setStatus('Готово! Можно скачать.');
+      } catch (err) {
+        console.error(err);
+        setStatus(`Ошибка: ${err.message}`, true);
+      } finally {
+        generateBtn.disabled = false;
+      }
+    }
+
+    function download() {
+      if (!lastResultBlob) return;
+      const url = URL.createObjectURL(lastResultBlob);
+      const a = document.createElement('a');
+      const [w, h] = sizeEl.value.split('x');
+      a.href = url;
+      a.download = `cover-${w}x${h}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function clearAll() {
+      promptEl.value = '';
+      photoInput.value = '';
+      photoItems = [];
+      lastResultBlob = null;
+      resultEl.style.backgroundImage = 'none';
+      downloadBtn.disabled = true;
+      setStatus('Ожидаю действий.');
+      renderFileList();
+      drawOverlay();
+      updateBadges();
+    }
+
+    sizeEl.addEventListener('change', updateBadges);
+    aspectEl.addEventListener('change', () => { aspectManual = true; drawOverlay(); });
+    resolutionEl.addEventListener('change', () => setStatus('Ожидаю действий.'));
+    promptEl.addEventListener('input', drawOverlay);
+    photoInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length) handleFiles(e.target.files);
+    });
+    generateBtn.addEventListener('click', generate);
+    downloadBtn.addEventListener('click', download);
+    clearBtn.addEventListener('click', clearAll);
+
+    updateBadges();
+    drawOverlay();
+  </script>
+</body>
+</html>
